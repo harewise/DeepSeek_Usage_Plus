@@ -1,6 +1,6 @@
 # DeepSeek Usage+ — 官方 API 用量页增强仪表盘
 
-> 在 DeepSeek 官方 API 用量页（`platform.deepseek.com/usage`）之外补充输入/输出拆分、缓存命中、均价、预估可用、模型明细表、按 API Key 汇总的费用明细与结构图表，并在对话页提供用量入口。
+> 在 DeepSeek 官方 API 用量页（`platform.deepseek.com/usage`）之外补充输入/输出拆分、缓存命中、均价、预估可用、模型明细表、按 API Key 汇总的费用明细与结构图表。
 
 一个油猴脚本（Userscript），无需后端、无需额外授权（`@grant none`），直接读取你已登录的 DeepSeek 官方页面数据，在页面上叠加一个增强分析仪表盘。
 
@@ -43,10 +43,6 @@
 - 面板折叠状态、额外图表开关持久化（`localStorage`）
 - 路由切换 / 页面刷新自动重新挂载，无需手动操作
 
-### 对话页（`chat.deepseek.com`）
-
-- 在对话页注入「API 用量」入口按钮，点击直达用量页
-
 ---
 
 ## 安装
@@ -73,7 +69,6 @@
 
 1. 登录 [DeepSeek 开放平台](https://platform.deepseek.com/usage)。
 2. 打开「用量」页，增强仪表盘会自动出现在官方总览下方。
-3. 在 [DeepSeek 对话页](https://chat.deepseek.com/) 侧边栏会出现「API 用量」入口按钮。
 
 ---
 
@@ -91,7 +86,7 @@
 | 项目 | 说明 |
 | --- | --- |
 | 浏览器 | 任意支持用户脚本管理器的现代浏览器 |
-| 生效页面 | `platform.deepseek.com/*`（用量页）与 `chat.deepseek.com/*`（对话页） |
+| 生效页面 | `platform.deepseek.com/*`（用量页） |
 | 依赖 | ECharts 5.6.0（由 `@require` 自动加载） |
 | 运行时机 | `document-idle` |
 
