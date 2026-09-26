@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DeepSeek — 官方API用量页增强仪表盘
 // @namespace    https://platform.deepseek.com/
-// @version      1.0.1
+// @version      1.0.2
 // @description  DeepSeek 官方API用量页增强分析：在官方总览之外补充输入/输出拆分、缓存命中、均价、预估可用、模型明细表、按 API Key 汇总当前区间费用明细与结构图表。
 // @author       zhiweili
 // @match        https://platform.deepseek.com/*
@@ -1564,14 +1564,15 @@
     bindPanelControls(panel);
   }
 
+  function rangeIncludesYmd(range, ymd) {
+    if (!range || !range.startDate || !range.endDate) return true;
+    return range.startDate <= ymd && ymd <= range.endDate;
+  }
+
   function findTodayUsageDay(days) {
     const todayYmd = formatUtcYmd(new Date());
-    const hit = days.find((day) => bucketTimeToDate(day.date) === todayYmd);
-    if (hit) return hit;
-    for (let i = days.length - 1; i >= 0; i -= 1) {
-      if (days[i].tokens > 0 || days[i].request > 0) return days[i];
-    }
-    return days.length ? days[days.length - 1] : null;
+    // 仅匹配真正的“今天”；区间不含今天时不得回退到区间末日，否则上月会把末日消费记成今日
+    return days.find((day) => bucketTimeToDate(day.date) === todayYmd) || null;
   }
 
   function sumTodayActualCnyCost(costBlocks) {
@@ -1621,13 +1622,15 @@
       : 0;
     const averageCostDetail = `输入 ${formatCnyAmount(averageInputCostPerMillion)} /1M\n输出 ${formatCnyAmount(averageOutputCostPerMillion)} /1M`;
 
-    const today = findTodayUsageDay(amount.days);
+    const todayYmd = formatUtcYmd(new Date());
+    const todayOutsideRange = !rangeIncludesYmd(range, todayYmd);
+    const today = todayOutsideRange ? null : findTodayUsageDay(amount.days);
     const todayInputTokens = today ? (today.promptMiss || 0) + (today.promptHit || 0) : 0;
     const todayOutputTokens = today ? (today.response || 0) : 0;
     const todayInputCostEstimated = averageInputCostPerMillion > 0 ? averageInputCostPerMillion * todayInputTokens / 1000000 : 0;
     const todayOutputCostEstimated = averageOutputCostPerMillion > 0 ? averageOutputCostPerMillion * todayOutputTokens / 1000000 : 0;
     const todayTotalCostEstimated = todayInputCostEstimated + todayOutputCostEstimated;
-    const todayActualCost = sumTodayActualCnyCost(cost);
+    const todayActualCost = todayOutsideRange ? 0 : sumTodayActualCnyCost(cost);
 
     // 优先 cost 日汇总，否则用均价估算；有实际总额时按估算比例拆输入/输出
     let todayTotalCost = todayTotalCostEstimated;
@@ -1644,8 +1647,15 @@
         todayOutputCost = 0;
       }
     }
+    if (todayOutsideRange) {
+      todayTotalCost = 0;
+      todayInputCost = 0;
+      todayOutputCost = 0;
+    }
 
-    const todayCostDetail = `输入 ${formatCnyAmount(todayInputCost)}\n输出 ${formatCnyAmount(todayOutputCost)}`;
+    const todayCostDetail = todayOutsideRange
+      ? "不在所选区间"
+      : `输入 ${formatCnyAmount(todayInputCost)}\n输出 ${formatCnyAmount(todayOutputCost)}`;
     const costDetail = (cnyCostBreakdown.input || cnyCostBreakdown.output)
       ? `输入 ${formatCnyAmount(cnyCostBreakdown.input)}\n输出 ${formatCnyAmount(cnyCostBreakdown.output)}`
       : "";
@@ -1673,6 +1683,7 @@
           ${renderSummaryCards({
             todayTotalCost,
             todayCostDetail,
+            todayOutsideRange,
             monthCnyCost,
             costDetail,
             averageCostPerMillion,
@@ -1732,6 +1743,7 @@
       monthCnyCost,
       todayTotalCost,
       todayCostDetail,
+      todayOutsideRange,
       costDetail,
       usageInput,
       usageDetail,
@@ -1791,6 +1803,7 @@
     const {
       todayTotalCost,
       todayCostDetail,
+      todayOutsideRange,
       monthCnyCost,
       costDetail,
       averageCostPerMillion,
@@ -1803,7 +1816,12 @@
     } = input;
 
     return (
-      summaryItem("今日消费", formatCnyValue(todayTotalCost), "CNY", todayCostDetail) +
+      summaryItem(
+        "今日消费",
+        todayOutsideRange ? "—" : formatCnyValue(todayTotalCost),
+        todayOutsideRange ? "" : "CNY",
+        todayCostDetail
+      ) +
       summaryItem("区间费用", formatCnyValue(monthCnyCost), "CNY", costDetail) +
       summaryItem("平均单价", formatCnyValue(averageCostPerMillion), "CNY /1M", averageCostDetail) +
       summaryItem("缓存命中", formatPercent(cacheRateValue), "", cacheDetail) +
@@ -2242,6 +2260,7 @@
       monthCnyCost,
       todayTotalCost,
       todayCostDetail,
+      todayOutsideRange,
       costDetail,
       usageInput,
       usageDetail,
@@ -2266,6 +2285,7 @@
       summaryEl.innerHTML = renderSummaryCards({
         todayTotalCost,
         todayCostDetail,
+        todayOutsideRange,
         monthCnyCost,
         costDetail,
         averageCostPerMillion,
